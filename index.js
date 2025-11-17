@@ -1,128 +1,277 @@
-const https = require('https');
-const axios = require('axios');
-const fs = require('fs');
+// const https = require("https");
+import puppeteer from "puppeteer";
+import { broadcastMessage } from "./handlers/telegramHandler.js";
+import {
+  checkIncomingMessages,
+  getKnownUsers,
+} from "./handlers/usersHandler.js";
 
-const URL = 'https://puppet-minsk.by/afisha';
-const TIMEOUT = 10 * 60 * 1000; // 15 минут
-const TIMEOUT_TEST = 5 * 1000;
-const TELEGRAM_TOKEN = '8258912807:AAGbXy_Jhkx8MaUNVkV2Gd6qJ5fNM7wUGQ8';
-const CHAT_ID = '567185513';
+const FREED_SEAT_CLASSNAME = "zone zone241";
 
-const LOOKING_FOR = 'Декабрь';
+const checkIfPageHasFreedSeats = (content) => {
+  return content.includes(FREED_SEAT_CLASSNAME);
+};
 
-const API_URL = `https://api.telegram.org/bot${TELEGRAM_TOKEN}`;
+const TIMEOUT = 15 * 60 * 1000; // 15 минут
+const TIMEOUT_TEST = 1000 * 60 * 2;
+const TIMEOUT_24HRS = 1000 * 60 * 60 * 24;
 
 let lastStatus = null; // Хранение предыдущего состояния
-let knownUsers = new Set();
+let knownUsers = getKnownUsers();
 
-// Загружаем chat_id пользователей из файла (если есть)
-if (fs.existsSync('users.json')) {
-  const data = JSON.parse(fs.readFileSync('users.json', 'utf-8'));
-  knownUsers = new Set(data);
-}
+// * https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3972# - красная шапочка много мест
+// * https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3895 - красная шапочка 2 места
 
-function saveUsers() {
-  fs.writeFileSync('users.json', JSON.stringify([...knownUsers], null, 2));
-}
+const urlsToWatchOnceADay = [
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3972#",
+];
 
-const getTimestamp = () => {
-  const now = new Date();
-  return now.toLocaleString('ru-RU', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+const urlsToParse = [
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3878",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3880",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3978",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3879",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3893",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3995",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3725",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3892",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3993",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3994",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3867",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3968",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3969",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3891",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3975",
+  "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3976",
+
+  // "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=3895",
+  // "https://tce.by/shows.html?base=RkZDMTE2MUQtMTNFNy00NUIyLTg0QzYtMURDMjRBNTc1ODA0&data=4055",
+];
+
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+const smartTimeout = async (page, url) => {
+  const start = Date.now();
+  const maxTimeout = 60000;
+  const checkInterval = 5000;
+
+  return new Promise(async (resolve, reject) => {
+    const loop = async () => {
+      if (Date.now() - start >= maxTimeout) {
+        return reject(
+          `[page#${url}] Timeout: page not loaded within ${maxTimeout / 1000}s`
+        );
+      }
+
+      await sleep(checkInterval);
+
+      const isAlreadyLoaded = await page.evaluate(() => {
+        return Array.from(document.body.children).some(
+          (el) =>
+            el.localName === "table" &&
+            el.id === "legend" &&
+            el.textContent.length > 0
+        );
+      });
+
+      if (isAlreadyLoaded) {
+        console.log(`[page#${url}] resolved!`);
+
+        return resolve();
+      } else {
+        console.log(`[page#${url}] still loading..`);
+        // Повторяем цикл
+        await loop();
+      }
+    };
+
+    await loop();
   });
 };
 
-async function sendMessage(chatId, text) {
-  try {
-    await axios.post(`${API_URL}/sendMessage`, {
-      chat_id: chatId,
-      text: text,
-    });
-  } catch (err) {
-    console.error(`Ошибка при отправке в чат ${chatId}:`, err.message);
-  }
-}
+//, 1666834266
 
-const broadcastMessage = async (text) => {
-  for (const userId of knownUsers) {
-    await sendMessage(userId, text);
-  }
+const parsePageContent = async (page, url) => {
+  await page.goto(url);
+
+  await smartTimeout(page, url).catch((reason) =>
+    console.log(`[page#${url}] Rejected:`, reason)
+  );
+
+  const content = await page.content();
+
+  const { title, date } = await page.evaluate(() => {
+    const title =
+      Array.from(document.body.children).find(
+        (element) => element.localName === "h1"
+      )?.textContent || "unknown";
+
+    const dateAndTimeHtml = Array.from(document.body.children).find(
+      (element) => element.localName === "h2"
+    ).children;
+
+    const date = Array.from(dateAndTimeHtml)
+      .map((el) => el.textContent)
+      .join(" ");
+
+    return { title, date };
+  });
+
+  const hasFreedSeats = checkIfPageHasFreedSeats(content);
+
+  const screenshotBase64 = hasFreedSeats
+    ? await page.screenshot({
+        encoding: "base64",
+      })
+    : null;
+
+  const numberOfFreedSeats = (content.match(/zone zone241/g) || []).length;
+
+  return {
+    content,
+    screenshotBase64,
+    numberOfFreedSeats,
+    hasFreedSeats,
+    title,
+    date,
+  };
 };
 
-const checkPage = () => {
-  https
-    .get(URL, (res) => {
-      let data = '';
+const loopThroughPages = async (urls) => {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
 
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', async () => {
-        const hasTextLookingFor = data.includes(LOOKING_FOR);
-        const timestamp = getTimestamp();
+  await page.setRequestInterception(true);
 
-        if (lastStatus !== hasTextLookingFor && hasTextLookingFor) {
-          const msgSuccessFormatted = `[${timestamp}] Появились билеты на ${LOOKING_FOR}. ОГО!`;
+  page.on("request", (request) => {
+    request.continue();
+  });
 
-          console.log(msgSuccessFormatted);
-          await broadcastMessage(msgSuccessFormatted);
-        } else {
-          const msgNoSuccessFormatted = `[${timestamp}] Увы, билетов на ${LOOKING_FOR} нет`;
+  page.on("response", (response) => {
+    // * response from php server with tickets data
+    if (response.url().includes("action=ticket&kind=json")) {
+      const status = response.status();
 
-          console.log(msgNoSuccessFormatted);
-          await broadcastMessage(msgNoSuccessFormatted);
-        }
-
-        lastStatus = hasTextLookingFor;
-      });
-    })
-    .on('error', async (err) => {
-      const timestamp = getTimestamp();
-      const message = `[${timestamp}] Ошибка при запросе: ${err.message}`;
-      console.error(message);
-      await broadcastMessage(message);
-    });
-};
-
-let lastUpdateId = 0;
-
-const checkIncomingMessages = async () => {
-  try {
-    const res = await axios.get(
-      `${API_URL}/getUpdates?offset=${lastUpdateId + 1}`
-    );
-    const updates = res.data.result;
-
-    for (const update of updates) {
-      lastUpdateId = update.update_id;
-
-      if (update.message && update.message.chat) {
-        const chatId = update.message.chat.id;
-
-        // Добавляем нового пользователя
-        if (!knownUsers.has(chatId)) {
-          knownUsers.add(chatId);
-          saveUsers();
-          console.log(`Новый пользователь: ${chatId}`);
-          await sendMessage(chatId, 'баобаб');
-        }
+      if (status === 429) {
+        console.error("ERR! php server returned 429 Too Many Requests!");
+      } else if (status !== 200) {
+        console.error(
+          `ERR! php server responded w unexpected status: ${status}`
+        );
       }
     }
-  } catch (err) {
-    console.error('Ошибка при получении апдейтов:', err.message);
+  });
+
+  const pagesWithFreedSeats = [];
+
+  for (const [index, url] of urls.entries()) {
+    const {
+      content,
+      screenshotBase64,
+      numberOfFreedSeats,
+      hasFreedSeats,
+      title,
+      date,
+    } = await parsePageContent(page, url);
+
+    if (hasFreedSeats) {
+      if (numberOfFreedSeats > 1) {
+        pagesWithFreedSeats.push({
+          url,
+          numberOfFreedSeats,
+          screenshotBase64,
+          title,
+          date,
+        });
+
+        console.log(
+          `[page#${url}] Found page with ${numberOfFreedSeats} free seats. Pushing to result object.`
+        );
+      } else {
+        console.log(`[page#${url}] Found page with one free seat. Skipped`);
+      }
+    } else {
+      console.log(`[page#${url}] Page parsed but no free seats were found.`);
+    }
   }
+
+  browser.close();
+
+  return pagesWithFreedSeats;
 };
 
-const exec = () => {
-  console.log('Start!');
-  checkPage();
-  setInterval(checkPage, TIMEOUT_TEST);
-
-  checkIncomingMessages();
-  setInterval(checkIncomingMessages, 60 * 1000);
+const escapeHtml = (s = "") => {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 };
 
-exec();
+const getNoun = (number, one, two, five) => {
+  let n = Math.abs(number);
+  n %= 100;
+  if (n >= 5 && n <= 20) {
+    return five;
+  }
+  n %= 10;
+  if (n === 1) {
+    return one;
+  }
+  if (n >= 2 && n <= 4) {
+    return two;
+  }
+  return five;
+};
+
+(async () => {
+  console.log("Bot is running!");
+
+  try {
+    const runIteration = async (urls, isOnceADay = false) => {
+      const pagesWithSeats = await loopThroughPages(urls);
+
+      // console.dir(pagesWithSeats.length);
+
+      if (pagesWithSeats.length > 0) {
+        const messageHtml = isOnceADay
+          ? `Найдено спектаклей со свободными местами: <b>${pagesWithSeats.length}</b>\n\n`
+          : `Ежедневная проверка мест на красную шапочку\n` +
+            pagesWithSeats
+              .map(
+                (page, index) =>
+                  `${index + 1}. <b>${escapeHtml(page.title)}</b> ${
+                    page.date
+                  } - <a href="${page.url}">${
+                    page.numberOfFreedSeats
+                  } ${getNoun(
+                    page.numberOfFreedSeats,
+                    "место",
+                    "места",
+                    "мест"
+                  )}</a>`
+              )
+              .join("\n\n");
+
+        broadcastMessage(messageHtml, knownUsers);
+      } else {
+        console.log(
+          `Свободных мест не найдено. Проверено представлений: ${urlsToParse.length}`
+        );
+      }
+    };
+
+    runIteration(urlsToParse);
+    setInterval(() => {
+      console.log("new interval call", new Date().toISOString());
+      runIteration(urlsToParse);
+    }, TIMEOUT);
+
+    runIteration(urlsToWatchOnceADay);
+    setInterval(() => runIteration(urlsToWatchOnceADay, true), TIMEOUT_24HRS);
+
+    checkIncomingMessages(knownUsers);
+    setInterval(() => checkIncomingMessages(knownUsers), 1000 * 60 * 60);
+  } catch (error) {
+    console.error("ERROR:", error);
+  }
+})();

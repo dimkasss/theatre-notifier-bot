@@ -2,14 +2,20 @@
   "name": "puppet-minsk-fetcher",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "axios": "^1.12.2"
+    "axios": "^1.12.2",
+    "puppeteer": "^24.29.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
