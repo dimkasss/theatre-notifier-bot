@@ -138,7 +138,7 @@ const parsePageContent = async (page, url) => {
 };
 
 const loopThroughPages = async (urls) => {
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({args: ['--no-sandbox']});
   const page = await browser.newPage();
 
   await page.setRequestInterception(true);
@@ -269,8 +269,8 @@ const getNoun = (number, one, two, five) => {
     runIteration(urlsToWatchOnceADay);
     setInterval(() => runIteration(urlsToWatchOnceADay, true), TIMEOUT_24HRS);
 
-    checkIncomingMessages(knownUsers);
-    setInterval(() => checkIncomingMessages(knownUsers), 1000 * 60 * 60);
+    //checkIncomingMessages(knownUsers);
+    //setInterval(() => checkIncomingMessages(knownUsers), 1000 * 60 * 60);
   } catch (error) {
     console.error("ERROR:", error);
   }

@@ -1,22 +1,24 @@
 import fs from "fs";
 import axios from 'axios';
 
-import users from "./users.json" with { type: "json" };
+
+// import users from "./users.json";
+// with { type: "json" };
 import { API_URL } from "./telegramHandler.js";
 
 let lastUpdateId = 0;
 
 const getKnownUsers = () => {
-  // if (fs.existsSync("/handlers/users.json")) {
-  //   const users = JSON.parse(fs.readFileSync("/handlers/users.json", "utf-8"));
-  //   return new Set(users);
-  // }
-  // console.log("nope");
-  // return new Set();
-
-  return users ? new Set(users) : new Set();
+  /*if (fs.existsSync("/handlers/users.json")) {
+    const users = JSON.parse(fs.readFileSync("/handlers/users.json", "utf-8"));
+    return new Set(users);
+  }
+  console.log("nope");
+  return new Set();
+	*/
+  // return users ? new Set(users) : new Set();
+  return new Set([567185513, 1666834266])
 };
-
 
 
 const checkIncomingMessages = async (knownUsers) => {
