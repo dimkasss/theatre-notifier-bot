@@ -233,9 +233,10 @@ const getNoun = (number, one, two, five) => {
       // console.dir(pagesWithSeats.length);
 
       if (pagesWithSeats.length > 0) {
-        const messageHtml = isOnceADay
+        const headerHtml = isOnceADay
           ? `Найдено спектаклей со свободными местами: <b>${pagesWithSeats.length}</b>\n\n`
-          : `Ежедневная проверка мест на красную шапочку\n` +
+          : `Ежедневная проверка мест на красную шапочку\n`;
+        const messageHtml = headerHtml +
             pagesWithSeats
               .map(
                 (page, index) =>
