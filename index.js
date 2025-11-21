@@ -267,8 +267,8 @@ const getNoun = (number, one, two, five) => {
       runIteration(urlsToParse);
     }, TIMEOUT);
 
-    runIteration(urlsToWatchOnceADay);
-    setInterval(() => runIteration(urlsToWatchOnceADay, true), TIMEOUT_24HRS);
+    // runIteration(urlsToWatchOnceADay);
+    // setInterval(() => runIteration(urlsToWatchOnceADay, true), TIMEOUT_24HRS);
 
     //checkIncomingMessages(knownUsers);
     //setInterval(() => checkIncomingMessages(knownUsers), 1000 * 60 * 60);
